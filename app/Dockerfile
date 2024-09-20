@@ -15,6 +15,11 @@ RUN Rscript -e 'BiocManager::install(c("Biostrings"),ask = F)'
 RUN rm -rf /srv/shiny-server/*
 COPY ./ /srv/shiny-server/
 
+# Make sure permissions are set so that the shiny user can read/write to the app directory.
+# This assumes that there is a 'data' directory within './' that you reference in your Shiny app.
+RUN chown -R shiny:shiny /srv/shiny-server && \
+    chmod -R 755 /srv/shiny-server
+
 USER shiny
 
 EXPOSE 3838

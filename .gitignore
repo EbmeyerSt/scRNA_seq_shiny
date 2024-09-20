@@ -1,2 +1,4 @@
 *.R
 *.qmd
+fake_data/
+dardeltest/
