@@ -93,19 +93,19 @@ server <- function(input, output) {
     observe({
 
         #Read in distinct seurat objects
-        seurat_objects$complete_2023 <- readRDS("data/2023_complete_filtered_norm_scaled.rds")
-        seurat_objects$'2023_ablated' <- readRDS("data/2023_ablated_filtered_norm_scaled.rds")
-        seurat_objects$'2023_nonablated' <- readRDS("data/2023_nonablated_filtered_norm_scaled.rds")
+        seurat_objects$complete_2023 <- readRDS("/home/data/2023_complete_filtered_norm_scaled.rds")
+        seurat_objects$'2023_ablated' <- readRDS("/home/data/2023_ablated_filtered_norm_scaled.rds")
+        seurat_objects$'2023_nonablated' <- readRDS("/home/data/2023_nonablated_filtered_norm_scaled.rds")
         
-        seurat_objects$complete_2024 <- readRDS("data/2024_complete_filtered_norm_scaled.rds")
-        seurat_objects$'2024_ablated' <- readRDS("data/2024_ablated_filtered_norm_scaled.rds")
-        seurat_objects$'2024_nonablated' <- readRDS("data/2024_nonablated_filtered_norm_scaled.rds")
-        seurat_objects$'2024_fed' <- readRDS("data/2024_fed_filtered_norm_scaled.rds")
-        seurat_objects$'2024_starved' <- readRDS("data/2024_starved_filtered_norm_scaled.rds")
+        seurat_objects$complete_2024 <- readRDS("/home/data/2024_complete_filtered_norm_scaled.rds")
+        seurat_objects$'2024_ablated' <- readRDS("/home/data/2024_ablated_filtered_norm_scaled.rds")
+        seurat_objects$'2024_nonablated' <- readRDS("/home/data/2024_nonablated_filtered_norm_scaled.rds")
+        seurat_objects$'2024_fed' <- readRDS("/home/data/2024_fed_filtered_norm_scaled.rds")
+        seurat_objects$'2024_starved' <- readRDS("/home/data/2024_starved_filtered_norm_scaled.rds")
     
         #Read in DEGs
-        seurat_objects$DEGs_2023 <- readRDS('data/DEGs_2023.rds')
-        seurat_objects$DEGs_2024 <- readRDS('data/DEGs_2024.rds')
+        seurat_objects$DEGs_2023 <- readRDS('/home/data/DEGs_2023.rds')
+        seurat_objects$DEGs_2024 <- readRDS('/home/data/DEGs_2024.rds')
     })  
     
     # Create a reactive expression for a subset of genes
