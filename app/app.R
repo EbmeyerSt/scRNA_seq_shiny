@@ -80,6 +80,20 @@ ui <- fluidPage(
                     **pct.1**: Percentage of cells in respective cluster expressing the gene, **pct.2***: percentage of all other cells expressing the gene,
                     **p_val_adjust**: Adjusted p-value after correction for multiple testing, **cluster**: cluster number, **gene**: gene name.'),
                     DT::dataTableOutput(outputId = 'deg_table')
+                ),
+                tabPanel('DEGs 2024 feeding',
+                h4('Differentially Expressed Genes between selected clusters (leiden clustering resolution 0.6) for variable "feeding"'),
+                p('Differentially expressed genes between one cluster and all others. Columns: **avg_log2FC**: Average log2 fold Change in expression,
+                    **pct.1**: Percentage of cells in respective cluster expressing the gene, **pct.2***: percentage of all other cells expressing the gene,
+                    **p_val_adjust**: Adjusted p-value after correction for multiple testing, **cluster**: cluster number'),
+                    DT::dataTableOutput(outputId = 'deg_table_2024_feeding')
+                ),
+                tabPanel('DEGs 2024 beta-cells',
+                h4('Differentially Expressed Genes between selected clusters (leiden clustering resolution 0.6) for variable "beta_cells"'),
+                p('Differentially expressed genes between one cluster and all others. Columns: **avg_log2FC**: Average log2 fold Change in expression,
+                    **pct.1**: Percentage of cells in respective cluster expressing the gene, **pct.2***: percentage of all other cells expressing the gene,
+                    **p_val_adjust**: Adjusted p-value after correction for multiple testing, **cluster**: cluster number'),
+                    DT::dataTableOutput(outputId = 'deg_table_2024_beta')
                 )
             )
         )
@@ -106,6 +120,8 @@ server <- function(input, output) {
         #Read in DEGs
         seurat_objects$DEGs_2023 <- readRDS('data/DEGs_2023.rds')
         seurat_objects$DEGs_2024 <- readRDS('data/DEGs_2024.rds')
+        seurat_objects$DEGs_2024_beta_cells <- readRDS('data/2024_leiden06_beta_DEGs.rds')
+        seurat_objects$DEGs_2024_feeding <- readRDS('data/2024_leiden06_feed_DEGs.rds')
     })  
     
     # Create a reactive expression for a subset of genes
@@ -130,9 +146,12 @@ server <- function(input, output) {
         degs <- if (grepl('2023', input$seurat_obj)) seurat_objects$DEGs_2023
                 else if (grepl('2024', input$seurat_obj)) seurat_objects$DEGs_2024
 
-        return(list(genes = genes, seurat_obj = seurat_obj, resolution = resolution, degs=degs))
-    }, ignoreNULL = FALSE)
+        degs_beta <- seurat_objects$DEGs_2024_beta_cells
+        degs_feeding <- seurat_objects$DEGs_2024_feeding
 
+        return(list(genes = genes, seurat_obj = seurat_obj, resolution = resolution, degs=degs,
+        degs_beta = degs_beta, degs_feeding = degs_feeding))
+    }, ignoreNULL = FALSE)
 
     # Render the plot for the selected gene expression
     output$genePlot <- renderPlot({
@@ -293,6 +312,32 @@ server <- function(input, output) {
 
         #Render dataframe with DT
         DT::datatable(dataframe, options = list(pageLength = 60))
+    })
+
+   #Create a table output for displaying the DEGs from 2024 data for cluster resolution 0.6, based on feeding
+    output$deg_table_2024_feeding <- renderDataTable({
+        # Ensuring gene_data is available
+        genes_data <- gene_data()
+        req(genes_data)
+        resolution <- genes_data$resolution
+        dataset <- input$seurat_obj
+        deg_list <- genes_data$degs_feeding
+
+        #Render dataframe with DT
+        DT::datatable(deg_list, options = list(pageLength = 60))
+    })
+
+    #Create a table output for displaying the DEGs from 2024 data for cluster resolution 0.6, based on beta_cells
+    output$deg_table_2024_beta <- renderDataTable({
+        # Ensuring gene_data is available
+        genes_data <- gene_data()
+        req(genes_data)
+        resolution <- genes_data$resolution
+        dataset <- input$seurat_obj
+        deg_list <- genes_data$degs_beta
+
+        #Render dataframe with DT
+        DT::datatable(deg_list, options = list(pageLength = 60))
     })
 
     }
