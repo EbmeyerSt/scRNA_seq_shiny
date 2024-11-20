@@ -82,15 +82,15 @@ ui <- fluidPage(
                     DT::dataTableOutput(outputId = 'deg_table')
                 ),
                 tabPanel('DEGs 2024 feeding',
-                h4('Differentially Expressed Genes between selected clusters (leiden clustering resolution 0.6) for variable "feeding"'),
-                p('Differentially expressed genes between one cluster and all others. Columns: **avg_log2FC**: Average log2 fold Change in expression,
+                h4('Differentially Expressed Genes for selected clusters (leiden clustering resolution 0.6) between conditions 'fed' and 'starved' for variable "feeding"'),
+                p('Differentially expressed genes between 'fed' and 'starved' for respective cluster. Columns: **avg_log2FC**: Average log2 fold Change in expression,
                     **pct.1**: Percentage of cells in respective cluster expressing the gene, **pct.2***: percentage of all other cells expressing the gene,
                     **p_val_adjust**: Adjusted p-value after correction for multiple testing, **cluster**: cluster number'),
                     DT::dataTableOutput(outputId = 'deg_table_2024_feeding')
                 ),
                 tabPanel('DEGs 2024 beta-cells',
-                h4('Differentially Expressed Genes between selected clusters (leiden clustering resolution 0.6) for variable "beta_cells"'),
-                p('Differentially expressed genes between one cluster and all others. Columns: **avg_log2FC**: Average log2 fold Change in expression,
+                h4('Differentially expressed genes for selected clusters (leiden clustering resolution 0.6) between conditions 'ablated' and 'non-ablated' for variable "beta_cells"'),
+                p('Differentially expressed genes between 'ablated' and 'non-ablated' for respective cluster. Columns: **avg_log2FC**: Average log2 fold Change in expression,
                     **pct.1**: Percentage of cells in respective cluster expressing the gene, **pct.2***: percentage of all other cells expressing the gene,
                     **p_val_adjust**: Adjusted p-value after correction for multiple testing, **cluster**: cluster number'),
                     DT::dataTableOutput(outputId = 'deg_table_2024_beta')
@@ -107,21 +107,21 @@ server <- function(input, output) {
     observe({
 
         #Read in distinct seurat objects
-        seurat_objects$complete_2023 <- readRDS("data/2023_complete_filtered_norm_scaled.rds")
-        seurat_objects$'2023_ablated' <- readRDS("data/2023_ablated_filtered_norm_scaled.rds")
-        seurat_objects$'2023_nonablated' <- readRDS("data/2023_nonablated_filtered_norm_scaled.rds")
+        seurat_objects$complete_2023 <- readRDS("/home/data/2023_complete_filtered_norm_scaled.rds")
+        seurat_objects$'2023_ablated' <- readRDS("/home/data/2023_ablated_filtered_norm_scaled.rds")
+        seurat_objects$'2023_nonablated' <- readRDS("/home/data/2023_nonablated_filtered_norm_scaled.rds")
         
-        seurat_objects$complete_2024 <- readRDS("data/2024_complete_filtered_norm_scaled.rds")
-        seurat_objects$'2024_ablated' <- readRDS("data/2024_ablated_filtered_norm_scaled.rds")
-        seurat_objects$'2024_nonablated' <- readRDS("data/2024_nonablated_filtered_norm_scaled.rds")
-        seurat_objects$'2024_fed' <- readRDS("data/2024_fed_filtered_norm_scaled.rds")
-        seurat_objects$'2024_starved' <- readRDS("data/2024_starved_filtered_norm_scaled.rds")
+        seurat_objects$complete_2024 <- readRDS("/home/data/2024_complete_filtered_norm_scaled.rds")
+        seurat_objects$'2024_ablated' <- readRDS("/home/data/2024_ablated_filtered_norm_scaled.rds")
+        seurat_objects$'2024_nonablated' <- readRDS("/home/data/2024_nonablated_filtered_norm_scaled.rds")
+        seurat_objects$'2024_fed' <- readRDS("/home/data/2024_fed_filtered_norm_scaled.rds")
+        seurat_objects$'2024_starved' <- readRDS("/home/data/2024_starved_filtered_norm_scaled.rds")
     
         #Read in DEGs
-        seurat_objects$DEGs_2023 <- readRDS('data/DEGs_2023.rds')
-        seurat_objects$DEGs_2024 <- readRDS('data/DEGs_2024.rds')
-        seurat_objects$DEGs_2024_beta_cells <- readRDS('data/2024_leiden06_beta_DEGs.rds')
-        seurat_objects$DEGs_2024_feeding <- readRDS('data/2024_leiden06_feed_DEGs.rds')
+        seurat_objects$DEGs_2023 <- readRDS('/home/data/DEGs_2023.rds')
+        seurat_objects$DEGs_2024 <- readRDS('/home/data/DEGs_2024.rds')
+        seurat_objects$DEGs_2024_beta_cells <- readRDS('home/data/2024_leiden06_beta_DEGs.rds')
+        seurat_objects$DEGs_2024_feeding <- readRDS('home/data/2024_leiden06_feed_DEGs.rds')
     })  
     
     # Create a reactive expression for a subset of genes
