@@ -120,8 +120,8 @@ server <- function(input, output) {
         #Read in DEGs
         seurat_objects$DEGs_2023 <- readRDS('/home/data/DEGs_2023.rds')
         seurat_objects$DEGs_2024 <- readRDS('/home/data/DEGs_2024.rds')
-        seurat_objects$DEGs_2024_beta_cells <- readRDS('home/data/2024_leiden06_beta_DEGs.rds')
-        seurat_objects$DEGs_2024_feeding <- readRDS('home/data/2024_leiden06_feed_DEGs.rds')
+        seurat_objects$DEGs_2024_beta_cells <- readRDS('/home/data/2024_leiden06_beta_DEGs.rds')
+        seurat_objects$DEGs_2024_feeding <- readRDS('/home/data/2024_leiden06_feed_DEGs.rds')
     })  
     
     # Create a reactive expression for a subset of genes
