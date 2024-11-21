@@ -82,15 +82,15 @@ ui <- fluidPage(
                     DT::dataTableOutput(outputId = 'deg_table')
                 ),
                 tabPanel('DEGs 2024 feeding',
-                h4('Differentially Expressed Genes for selected clusters (leiden clustering resolution 0.6) between conditions 'fed' and 'starved' for variable "feeding"'),
-                p('Differentially expressed genes between 'fed' and 'starved' for respective cluster. Columns: **avg_log2FC**: Average log2 fold Change in expression,
+                h4('Differentially Expressed Genes for selected clusters (leiden clustering resolution 0.6) between conditions "fed" and "starved" for variable "feeding"'),
+                p('Differentially expressed genes between "fed" and "starved" for respective cluster. Columns: **avg_log2FC**: Average log2 fold Change in expression,
                     **pct.1**: Percentage of cells in respective cluster expressing the gene, **pct.2***: percentage of all other cells expressing the gene,
                     **p_val_adjust**: Adjusted p-value after correction for multiple testing, **cluster**: cluster number'),
                     DT::dataTableOutput(outputId = 'deg_table_2024_feeding')
                 ),
                 tabPanel('DEGs 2024 beta-cells',
-                h4('Differentially expressed genes for selected clusters (leiden clustering resolution 0.6) between conditions 'ablated' and 'non-ablated' for variable "beta_cells"'),
-                p('Differentially expressed genes between 'ablated' and 'non-ablated' for respective cluster. Columns: **avg_log2FC**: Average log2 fold Change in expression,
+                h4('Differentially expressed genes for selected clusters (leiden clustering resolution 0.6) between conditions "ablated" and "non-ablated" for variable "beta_cells"'),
+                p('Differentially expressed genes between "ablated" and "non-ablated" for respective cluster. Columns: **avg_log2FC**: Average log2 fold Change in expression,
                     **pct.1**: Percentage of cells in respective cluster expressing the gene, **pct.2***: percentage of all other cells expressing the gene,
                     **p_val_adjust**: Adjusted p-value after correction for multiple testing, **cluster**: cluster number'),
                     DT::dataTableOutput(outputId = 'deg_table_2024_beta')
