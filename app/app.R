@@ -3,6 +3,7 @@ library(Seurat)
 library(dplyr)
 library(DT)
 library(ggplot2)
+library(plotly)
 
 #Set working directories for local and for deployment on scilifelab serve
 #setwd('/srv/shiny-server')
@@ -66,7 +67,7 @@ ui <- fluidPage(
                 tabPanel('Clustering',
                     h4("Leiden Clusters and Dot Plot"),
                     p("Shows the different leiden clusters at the selected resolution. The dot plot shows gene exprrssion relative to other clusters."),
-                    plotOutput(outputId = "cluster_umap", width = "90%", height = "600px"),
+                    plotlyOutput(outputId = "cluster_umap", width = "90%", height = "600px"),
                     plotOutput(outputId = "genePlot", width = "100%", height = "500px")
                 ),
                 tabPanel('Expression Plots',
@@ -171,7 +172,7 @@ server <- function(input, output) {
     })
     
      # Render the UMAP plot for the selected resolution
-    output$cluster_umap <- renderPlot({
+    output$cluster_umap <- renderPlotly({
         genes_data <- gene_data()
         req(genes_data) # Ensure that the gene data is available
         seurat_obj <- genes_data$seurat_obj
@@ -181,12 +182,29 @@ server <- function(input, output) {
             return()
         }
 
+                #create cluster dimplot based on input data
         if (input$seurat_obj %in% c('complete_2023', '2023_ablated', '2023_nonablated')){
-        DimPlot(seurat_obj, reduction='umap', group.by = resolution, label = TRUE, label.size = 7, repel = TRUE)}
-
+            clusterplot <- DimPlot(seurat_obj, reduction='umap', group.by = resolution, label = TRUE, label.size = 7, repel = TRUE)}
         else if (input$seurat_obj %in% c('complete_2024', '2024_ablated', '2024_nonablated', '2024_fed', '2024_starved')){
-        DimPlot(seurat_obj, reduction = "umap_harmony", group.by = resolution, label = TRUE, label.size= 7, repel = TRUE)}
+            clusterplot <- DimPlot(seurat_obj, reduction = "umap_harmony", group.by = resolution, label = TRUE, label.size= 7, repel = TRUE)}
 
+        #Modify plotly object to make the plot interactive
+        if (!is.null(clusterplot)){
+            plotly_obj <- ggplotly(clusterplot)
+            plotly_obj <- config(plotly_obj, displaylogo = FALSE, modeBarButtonsToRemove=c('pan2d', 'hoverCompareCartesian', 'drawrect', 'select2d')) %>%
+                layout(dragmode = 'select', legend='toggleothers', title=list(text='Leiden clusters', size=7))
+
+            #For each cluster in the data. go through the list and modify the text
+            for (i in 1:(length(plotly_obj$x$data)-1)){
+                htext <- plotly_obj$x$data[[i]]$text
+                elements <- unlist(strsplit(htext, '<br />'))
+                cluster_info <- grep('^leiden', elements, value = TRUE)
+                new_info <- gsub('leiden_cluster\\.([0-9]+): ', 'Cluster: ', cluster_info)
+                plotly_obj$x$data[[i]]$text <- new_info
+            } 
+
+        plotly_obj
+        }
     })
 
     #Conditional umap plots colored by conditions
