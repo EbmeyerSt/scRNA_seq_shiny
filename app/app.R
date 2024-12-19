@@ -7,7 +7,7 @@ library(plotly)
 
 #Set working directories for local and for deployment on scilifelab serve
 #setwd('/srv/shiny-server')
-setwd('/Users/stefanebmeyer/nbis/support_projects/O_Andersson_2024/scripts/scilifelab_serve_shiny2/shiny_december24/')
+#setwd('/Users/stefanebmeyer/nbis/support_projects/O_Andersson_2024/scripts/scilifelab_serve_shiny2/shiny_december24/')
 
 
 ui <- fluidPage(
