@@ -4,10 +4,11 @@ library(dplyr)
 library(DT)
 library(ggplot2)
 library(plotly)
+library(gridExtra)
 
 #Set working directories for local and for deployment on scilifelab serve
 #setwd('/srv/shiny-server')
-#setwd('/Users/stefanebmeyer/nbis/support_projects/O_Andersson_2024/scripts/scilifelab_serve_shiny2/shiny_december24/')
+setwd('/Users/stefanebmeyer/nbis/support_projects/O_Andersson_2024/scripts/scilifelab_serve_shiny2/shiny_december24/')
 
 
 ui <- fluidPage(
@@ -58,6 +59,22 @@ ui <- fluidPage(
         
         mainPanel(
             tabsetPanel(
+                tabPanel('QC',
+                    h4("Data Quality Control Plots"),
+                    br(),
+                    h5('Percent of mitochondrial and ribiosomal genes per sample, and count of total reads per cell and sample
+                      (nCount_RNA) and number of expressed genes per cell and sample (nFeature_RNA).'),
+                    plotOutput(outputId = 'qc_mito', width = "90%", height = "700px"),
+                    br(),
+                    h5('FeatureScatter plots'),
+                    plotOutput(outputId = 'qc_featurescatter', width = "100%", height = "400px"),
+                    br(),
+                    h5('Expressed genes on (integrated) UMAP'),
+                    plotOutput(outputId = 'qc_nfeature_rna', width = "90%", height = "500px"),
+                    br(),
+                    h5('Cell Cycle Score on (integrated) UMAP'),
+                    plotOutput(outputId = 'qc_cellcycle', width = "90%", height = "800px")
+                    ),
                 tabPanel('Overview',
                     h4("Data/Metadata Overview"),
                     p("UMAP plots with cells colored by different metadata."),
@@ -116,9 +133,9 @@ server <- function(input, output) {
     
     observe({
       
-        #all_objs <- readRDS('/Users/stefanebmeyer/nbis/support_projects/O_Andersson_2024/scripts/scilifelab_serve_shiny2/shiny_december24/data/all_objects_int.rds')
+        all_objs <- readRDS('/Users/stefanebmeyer/nbis/support_projects/O_Andersson_2024/scripts/scilifelab_serve_shiny2/shiny_december24/data/all_objects_int.rds')
         #Below path is for scilifelab serve
-        all_objs <- readRDS('/home/data/all_objects_int.rds')
+        #all_objs <- readRDS('/home/data/all_objects_int.rds')
 
         #Read in distinct seurat objects
         seurat_objects$complete_2023 <- all_objs$enteroendocrine_2023$seurat_objects$complete_2023
@@ -429,6 +446,76 @@ server <- function(input, output) {
 
         #Render dataframe with DT
         DT::datatable(deg_list, options = list(pageLength = 60))
+    })
+    
+    output$qc_mito <- renderPlot({
+      genes_data <- gene_data()
+      req(genes_data) # Ensure that the gene data is available
+      seurat_obj <- genes_data$seurat_obj
+      resolution <- genes_data$resolution
+      
+      if (is.null(genes_data)) {
+        return()
+      }
+      
+      #create Violin plot based on input data
+      VlnPlot(seurat_obj, features=c('percent_mt', 'percent_ribo', 'nFeature_RNA', 'nCount_RNA'), group.by = 'sample_id', ncol=2)
+    })
+    
+    output$qc_featurescatter <- renderPlot({
+      genes_data <- gene_data()
+      req(genes_data) # Ensure that the gene data is available
+      seurat_obj <- genes_data$seurat_obj
+      resolution <- genes_data$resolution
+      
+      if (is.null(genes_data)) {
+        return()
+      }
+      p1 <-FeatureScatter(seurat_obj, feature1 = 'nCount_RNA', feature2 = 'nFeature_RNA', group.by='sample_id') +
+        theme(legend.position = "none", 
+              axis.text.x = element_text(angle=45, hjust=1, vjust=1))
+      p2 <- FeatureScatter(seurat_obj, feature1 = 'nCount_RNA', feature2 = 'percent_mt', group.by='sample_id') +
+        theme(legend.position = "none", 
+              axis.text.x = element_text(angle=45, hjust=1, vjust=1))
+      p3 <- FeatureScatter(seurat_obj, feature1 = 'nCount_RNA', feature2 = 'percent_ribo', group.by='sample_id') +
+        theme(legend.position = "none", 
+              axis.text.x = element_text(angle=45, hjust=1, vjust=1))
+      
+      grid.arrange(grobs = list(p1, p2, p3), ncol=3, nrow=1)
+    })
+    
+    output$qc_nfeature_rna <- renderPlot({
+      genes_data <- gene_data()
+      req(genes_data) # Ensure that the gene data is available
+      seurat_obj <- genes_data$seurat_obj
+      resolution <- genes_data$resolution
+      
+      if (is.null(genes_data)) {
+        return()
+      }
+      if (input$seurat_obj %in% c('complete_2023', 'complete_2024', '2024_fed',
+                                  '2024_nonablated', '2023_starved', 'complete_progenitors',
+                                  'progenitors_DMSO', 'progenitors_SMER28')){
+        FeaturePlot(seurat_obj, reduction='umap_integrated', dims = 1:2, features='nFeature_RNA', ncol = 1)}
+      else if (input$seurat_obj %in% c('2024_ablated', '2024_starved', '2023_ablated', '2023_nonablated')){
+        FeaturePlot(seurat_obj, reduction='umap', dims = 1:2, features='nFeature_RNA', ncol = 1)}
+    })
+    
+    output$qc_cellcycle <- renderPlot({
+      genes_data <- gene_data()
+      req(genes_data) # Ensure that the gene data is available
+      seurat_obj <- genes_data$seurat_obj
+      resolution <- genes_data$resolution
+      
+      if (is.null(genes_data)) {
+        return()
+      }
+      if (input$seurat_obj %in% c('complete_2023', 'complete_2024', '2024_fed',
+                                  '2024_nonablated', '2023_starved', 'complete_progenitors',
+                                  'progenitors_DMSO', 'progenitors_SMER28')){
+        FeaturePlot(seurat_obj, reduction='umap_integrated', dims = 1:2, features=c('S.Score', 'G2M.Score'), ncol = 1)}
+      else if (input$seurat_obj %in% c('2024_ablated', '2024_starved', '2023_ablated', '2023_nonablated')){
+        FeaturePlot(seurat_obj, reduction='umap', dims = 1:2, features=c('S.Score', 'G2M.Score'), ncol = 1)}
     })
 
     }
