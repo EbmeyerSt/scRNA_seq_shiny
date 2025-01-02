@@ -8,7 +8,7 @@ library(gridExtra)
 
 #Set working directories for local and for deployment on scilifelab serve
 #setwd('/srv/shiny-server')
-setwd('/Users/stefanebmeyer/nbis/support_projects/O_Andersson_2024/scripts/scilifelab_serve_shiny2/shiny_december24/')
+#setwd('/Users/stefanebmeyer/nbis/support_projects/O_Andersson_2024/scripts/scilifelab_serve_shiny2/shiny_december24/')
 
 
 ui <- fluidPage(
@@ -133,9 +133,9 @@ server <- function(input, output) {
     
     observe({
       
-        all_objs <- readRDS('/Users/stefanebmeyer/nbis/support_projects/O_Andersson_2024/scripts/scilifelab_serve_shiny2/shiny_december24/data/all_objects_int.rds')
+        #all_objs <- readRDS('/Users/stefanebmeyer/nbis/support_projects/O_Andersson_2024/scripts/scilifelab_serve_shiny2/shiny_december24/data/all_objects_int.rds')
         #Below path is for scilifelab serve
-        #all_objs <- readRDS('/home/data/all_objects_int.rds')
+        all_objs <- readRDS('/home/data/all_objects_int.rds')
 
         #Read in distinct seurat objects
         seurat_objects$complete_2023 <- all_objs$enteroendocrine_2023$seurat_objects$complete_2023
