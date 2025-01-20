@@ -8,7 +8,7 @@ library(gridExtra)
 
 #Set working directories for local and for deployment on scilifelab serve
 #setwd('/srv/shiny-server')
-#setwd('/Users/stefanebmeyer/nbis/support_projects/O_Andersson_2024/scripts/scilifelab_serve_shiny2/shiny_december24/')
+setwd('/Users/stefanebmeyer/nbis/support_projects/O_Andersson_2024/scripts/scilifelab_serve_shiny2/shiny_december24/')
 
 
 ui <- fluidPage(
@@ -49,6 +49,13 @@ ui <- fluidPage(
                     "0.9" = 'leiden_cluster.09',
                     "1.2" = 'leiden_cluster.12')
       ),
+      radioButtons(
+        inputId = 'clust_annot',
+        label = 'Cluster/Dotplot annotation:',
+        choices = c('Cluster numbers' = NA, 
+                    'Cell type' = 'cell_type')
+      ),
+      
       textInput(
         inputId = "genes",
         label = "Enter Gene Names (comma separated):",
@@ -69,9 +76,9 @@ server <- function(input, output) {
   
   observe({
     
-    #all_objs <- readRDS('/Users/stefanebmeyer/nbis/support_projects/O_Andersson_2024/scripts/scilifelab_serve_shiny2/shiny_december24/data/all_objects_int.rds')
+    all_objs <- readRDS('/Users/stefanebmeyer/nbis/support_projects/O_Andersson_2024/scripts/scilifelab_serve_shiny2/shiny_december24/data/all_objects_int.rds')
     #Below path is for scilifelab serve
-    all_objs <- readRDS('/home/data/all_objects_int.rds')
+    #all_objs <- readRDS('/home/data/all_objects_int.rds')
     
     #Read in distinct seurat objects
     seurat_objects$complete_2023 <- all_objs$enteroendocrine_2023$seurat_objects$complete_2023
@@ -144,10 +151,10 @@ server <- function(input, output) {
                plotOutput(outputId = 'qc_featurescatter', width = "100%", height = "400px"),
                br(),
                h5('Expressed genes on (integrated) UMAP'),
-               plotOutput(outputId = 'qc_nfeature_rna', width = "90%", height = "500px"),
+               plotOutput(outputId = 'qc_nfeature_rna', width = "90%", height = "600px"),
                br(),
                h5('Cell Cycle Score on (integrated) UMAP'),
-               plotOutput(outputId = 'qc_cellcycle', width = "90%", height = "800px")
+               plotOutput(outputId = 'qc_cellcycle', width = "90%", height = "1100px")
       ),
       tabPanel('Overview',
                h4("Data/Metadata Overview"),
@@ -157,8 +164,11 @@ server <- function(input, output) {
       tabPanel('Clustering',
                h4("Leiden Clusters and Dot Plot"),
                p("Shows the different leiden clusters at the selected resolution. The dot plot shows gene expression relative to other clusters."),
-               plotlyOutput(outputId = "cluster_umap", width = "90%", height = "600px"),
-               plotOutput(outputId = "genePlot", width = "100%", height = "500px")
+               plotlyOutput(outputId = "cluster_umap", width = "100%", height = "600px"),
+               p(),
+               p(),
+               #dynamically define height for dotplot
+               plotOutput(outputId = "genePlot", width = "100%", height = paste0(length(input$genes)*50+450, 'px'))
       ),
       tabPanel('Expression Plots',
                h4('Feature/Expression Plots'),
@@ -237,7 +247,32 @@ server <- function(input, output) {
       return()
     }
     
-    DotPlot(seurat_obj, features = genes, group.by = resolution) + coord_flip()
+    if (input$clust_annot=='cell_type' & 'cell_type' %in% colnames(seurat_obj@meta.data)){
+      grouping='cell_type'
+      label_size=10
+      legend_size=10
+    }
+    else {
+      grouping=resolution
+      label_size=14
+      legend_size=14
+    }
+    
+    if (grouping=='cell_type'){
+      
+      #Sort seurat object in reverse in order not to cut off cell names in app
+      values <- seurat_obj@meta.data$cell_type
+      sorted_values <- sort(unique(values), decreasing = TRUE)
+      sorted_obj <- seurat_obj
+      sorted_obj[['cell_type']] <- factor(values, levels = sorted_values)
+      
+      DotPlot(sorted_obj, features = genes, group.by = grouping) + coord_flip() +
+        theme(axis.text.x = element_text(angle=45, hjust = 1),
+              plot.margin = margin(t = 10, r = 10, b = 10, l = 10, unit = "pt"))
+    }
+    else {
+      DotPlot(seurat_obj, features = genes, group.by = grouping) + coord_flip()
+    }
     
   })
   
@@ -252,27 +287,43 @@ server <- function(input, output) {
       return()
     }
     
+    if (input$clust_annot=='cell_type' & 'cell_type' %in% colnames(seurat_obj@meta.data)){
+      grouping='cell_type'
+      label_size=10
+      legend_size=10
+    }
+    else {
+      grouping=resolution
+      label_size=14
+      legend_size=14
+    }
+    
     #create cluster dimplot based on input data
     if (input$seurat_obj %in% c('complete_2023', 'complete_2024', '2024_fed',
                                 '2024_nonablated', '2023_starved', 'complete_progenitors',
                                 'progenitors_DMSO', 'progenitors_SMER28')){
-      clusterplot <- DimPlot(seurat_obj, reduction='umap_integrated', group.by = resolution, label = TRUE, label.size= 7, repel = TRUE)}
+      clusterplot <- DimPlot(seurat_obj, reduction='umap_integrated', group.by = grouping, label = TRUE, label.size= label_size, repel = TRUE)}
     else if (input$seurat_obj %in% c('2024_ablated', '2024_starved', '2023_ablated', '2023_nonablated')){
-      clusterplot <- DimPlot(seurat_obj, reduction='umap', group.by = resolution, label = TRUE, label.size= 7, repel = TRUE)}
-    
+      clusterplot <- DimPlot(seurat_obj, reduction='umap', group.by = grouping, label = TRUE, label.size= label_size, repel = TRUE)}
     
     #Modify plotly object to make the plot interactive
     if (!is.null(clusterplot)){
       plotly_obj <- ggplotly(clusterplot)
       plotly_obj <- config(plotly_obj, displaylogo = FALSE, modeBarButtonsToRemove=c('pan2d', 'hoverCompareCartesian', 'drawrect', 'select2d')) %>%
-        layout(dragmode = 'select', legend='toggleothers', title=list(text='Louvain clusters', size=7))
+        layout(dragmode = 'select', legend=list(font=list(size=legend_size)), title=list(text='Louvain clusters', size=7))
       
       #For each cluster in the data. go through the list and modify the text
       for (i in 1:(length(plotly_obj$x$data)-1)){
         htext <- plotly_obj$x$data[[i]]$text
         elements <- unlist(strsplit(htext, '<br />'))
-        cluster_info <- grep('^leiden', elements, value = TRUE)
-        new_info <- gsub('leiden_cluster\\.([0-9]+): ', 'Cluster: ', cluster_info)
+        if (input$clust_annot=='cell_type' & 'cell_type' %in% colnames(seurat_obj@meta.data)){
+          cluster_info <- grep('^cell_type', elements, value = TRUE)
+          new_info <- gsub('cell_type: ', '', cluster_info) 
+        }
+        else {
+          cluster_info <- grep('^leiden', elements, value = TRUE)
+          new_info <- gsub('leiden_cluster\\.([0-9]+): ', 'Cluster: ', cluster_info)
+        }
         plotly_obj$x$data[[i]]$text <- new_info
       } 
       
