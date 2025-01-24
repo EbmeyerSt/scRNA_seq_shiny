@@ -5,13 +5,16 @@ library(DT)
 library(ggplot2)
 library(plotly)
 library(gridExtra)
+library(shinyjs)
 
 #Set working directories for local and for deployment on scilifelab serve
 #setwd('/srv/shiny-server')
-#setwd('/Users/stefanebmeyer/nbis/support_projects/O_Andersson_2024/scripts/scilifelab_serve_shiny2/shiny_december24/')
+setwd('/Users/stefanebmeyer/nbis/support_projects/O_Andersson_2024/scripts/scilifelab_serve_shiny2/shiny_december24/')
 
 
 ui <- fluidPage(
+  shinyjs::useShinyjs(),
+  
   tags$head(
     tags$style(HTML("
         .scrolling-panel { 
@@ -42,7 +45,7 @@ ui <- fluidPage(
       ),
       radioButtons(
         inputId = "resolution",
-        label = "Leiden cluster Resolution:",
+        label = "Louvain cluster Resolution:",
         choices = c("0.1" = 'leiden_cluster.01',
                     "0.3" = 'leiden_cluster.03',
                     "0.6" = 'leiden_cluster.06',
@@ -52,7 +55,7 @@ ui <- fluidPage(
       radioButtons(
         inputId = 'clust_annot',
         label = 'Cluster/Dotplot annotation:',
-        choices = c('Cluster numbers' = NA, 
+        choices = c('Cluster numbers' = 'leiden_cluster.01', 
                     'Cell type' = 'cell_type')
       ),
       
@@ -70,15 +73,15 @@ ui <- fluidPage(
   )
 )
 
-server <- function(input, output) {
+server <- function(input, output, session) {
   # Load Seurat objects into reactive values for use in other reactive expressions
   seurat_objects <- reactiveValues()
   
   observe({
     
-    #all_objs <- readRDS('/Users/stefanebmeyer/nbis/support_projects/O_Andersson_2024/objects_november24/all_objects_int.rds')
+    all_objs <- readRDS('/Users/stefanebmeyer/nbis/support_projects/O_Andersson_2024/objects_november24/all_objects_int.rds')
     #Below path is for scilifelab serve
-    all_objs <- readRDS('/home/data/all_objects_int.rds')
+    #all_objs <- readRDS('/home/data/all_objects_int.rds')
     
     #Read in distinct seurat objects
     seurat_objects$complete_2023 <- all_objs$enteroendocrine_2023$seurat_objects$complete_2023
@@ -101,7 +104,66 @@ server <- function(input, output) {
     seurat_objects$DEGs_progenitors <- all_objs$progenitors_2024$DEGs
     seurat_objects$DEGs_2024_beta_cells <- all_objs$enteroendocrine_2024$DEGs$complete_2024$DEGs_beta_06
     seurat_objects$DEGs_2024_feeding <- all_objs$enteroendocrine_2024$DEGs$complete_2024$DEGs_feed_06
+    
+    #Add value to observe when a cluster is clicked in clusterplot
+    seurat_objects$selected_cluster <- reactiveVal(0)
   })  
+  
+  #Reset resolution and cluster annotation upon changing the dataset
+  observeEvent(input$seurat_obj, {
+    updateRadioButtons(session, "resolution", selected = 'leiden_cluster.01')
+    # Update the 'clust_annot' radio button to 'Cluster numbers'
+    updateRadioButtons(session, "clust_annot", selected = 'leiden_cluster.01')
+  })
+  
+  #Set resolution to corresponding value and disable selection when cell type is selected as annotation
+  observeEvent(input$clust_annot, {
+    if (input$clust_annot == "cell_type") {
+      if (input$seurat_obj %in% c('complete_progenitors','progenitors_DMSO','progenitors_SMER28')){
+        updateRadioButtons(session, "resolution", selected = 'leiden_cluster.09')
+      }
+      else {
+        updateRadioButtons(session, "resolution", selected = 'leiden_cluster.06')
+      }
+      shinyjs::disable("resolution")
+    } else {
+      updateRadioButtons(session, "resolution", selected = 'leiden_cluster.01')
+      shinyjs::enable("resolution")
+    }
+  })
+  
+  #Enable annotation by cell type only if dataset has annotations
+  observeEvent(input$seurat_obj, {
+    if (input$seurat_obj %in% c('complete_progenitors','complete_2024')){
+      shinyjs::enable('clust_annot')
+    }
+    else {
+      shinyjs::disable('clust_annot')
+    }
+  })
+  
+  #Trigger update button upon changing the seurat object
+  observeEvent(input$seurat_obj, {
+    seurat_objects$selected_cluster(0)
+    shinyjs::click('update')
+  })
+  
+  #Trigger update button upon changing the resolution
+  observeEvent(input$resolution, {
+    seurat_objects$selected_cluster(0)
+    shinyjs::click('update')
+  })
+  
+  #Observe clicks on the clustered UMAP
+  observeEvent(event_data('plotly_click', source = 'cluster_umap'), {
+    click_data <- event_data('plotly_click', source = 'cluster_umap')
+    print(paste0('Click_data: ', click_data))
+    if (!is.null(click_data) && !is.na(click_data$curve)) {
+      seurat_objects$selected_cluster(click_data$curve)
+    } else {
+      seurat_objects$selected_cluster(0)  # Default to cluster 0
+    }
+  }, ignoreInit = TRUE)
   
   # Create a reactive expression for a subset of genes
   gene_data <- eventReactive(input$update, {
@@ -125,6 +187,9 @@ server <- function(input, output) {
     
     resolution <- input$resolution
     
+    #Set object identities to resolution
+    Idents(seurat_obj) <- seurat_obj@meta.data[,colnames(seurat_obj[[resolution]])[1]]
+    
     degs <- if (grepl('2023', input$seurat_obj)) seurat_objects$DEGs_2023
     else if (grepl('progenitor', input$seurat_obj)) seurat_objects$DEGs_progenitors
     else if (grepl('2024', input$seurat_obj)) seurat_objects$DEGs_2024
@@ -136,6 +201,74 @@ server <- function(input, output) {
     return(list(genes = genes, seurat_obj = seurat_obj, resolution = resolution, degs=degs,
                 degs_beta = degs_beta, degs_feeding = degs_feeding))
   }, ignoreNULL = FALSE)
+  
+  #Function to be called reactively to generate QC plots per cluster
+  generate_cluster_plots <- function(seurat_obj, cluster, resolution) {
+    print(resolution)
+    if (input$clust_annot=='cell_type'){
+      cell_type_name <- seurat_obj@meta.data$cell_type[seurat_obj[[resolution]]==cluster][1]
+      print(cell_type_name)
+      seurat_obj <- subset(seurat_obj, subset = cell_type == cell_type_name)
+    }
+    else {
+      seurat_obj <- subset(seurat_obj, idents = cluster)
+    }
+    
+    # Violin plot for mitochondrial genes
+    vln_mt <- VlnPlot(seurat_obj, features = c("percent_mt", "percent_ribo", "nFeature_RNA", "nCount_RNA"), ncol = 2, log = TRUE)
+    # Feature plot for S phase
+    feature_s <- FeaturePlot(seurat_obj, features = c("nFeature_RNA", "percent_mt"), ncol=2, cols=c('blue', 'red'))
+    
+    #Also generate frequency tables
+    if (input$seurat_obj %in% c('complete_progenitors','progenitors_DMSO','progenitors_SMER28')){
+      df1 <- as.data.frame(table(seurat_obj@meta.data$treatment))
+      names(df1) <- c('Treatment', 'n cells')
+      
+      df2 <- as.data.frame(table(seurat_obj@meta.data$day))
+      names(df2) <- c('Day', 'n cells')
+      
+    }
+    else {
+      df1 <- as.data.frame(table(seurat_obj@meta.data$beta_cells))
+      names(df1) <- c('Beta-cell state', 'n cells')
+      print(df1)
+      
+      df2 <- as.data.frame(table(seurat_obj@meta.data$feeding))
+      names(df2) <- c('Feeding state', 'n cells')
+    }
+    
+    return(list(vln_mt = vln_mt, feature_s = feature_s, df1 = df1, df2 = df2))
+  }
+  
+  #Generate function to create QC plots based on cluster input
+  cluster_plots <- reactive({
+    
+    genes_data <- gene_data()
+    seurat_obj <- genes_data$seurat_obj
+    resolution <- genes_data$resolution
+    req(genes_data)
+    
+    #Set resolution manually in case clust_annot == 'cell_type'
+    if (input$clust_annot == 'cell_type'){
+      if (input$seurat_obj %in% c('complete_2024')){
+        resolution = 'leiden_cluster.06'
+      }
+      else if (input$seurat_obj %in% c('complete_progenitors')){
+        resolution = 'leiden_cluster.09'
+      }
+    }
+    #Set seurat object identities to resolution
+    print(paste0('Setting identities to ', colnames(seurat_obj[[resolution]])[1]))
+    Idents(seurat_obj) <- seurat_obj@meta.data[,colnames(seurat_obj[[resolution]])[1]]
+    
+    print(paste0('Selected cluster: ',seurat_objects$selected_cluster()))
+    selected_cluster_val <- seurat_objects$selected_cluster()
+    print(paste0('selected_cluster_val: ',selected_cluster_val))
+    
+    clst_plts <- generate_cluster_plots(seurat_obj, selected_cluster_val, resolution)
+    
+    return(clst_plts)
+  })
   
   #Create list of UI output tabs
   output$tabs_ui <- renderUI({
@@ -168,7 +301,16 @@ server <- function(input, output) {
                p(),
                p(),
                #dynamically define height for dotplot
-               plotOutput(outputId = "genePlot", width = "100%", height = paste0(length(input$genes)*50+450, 'px'))
+               plotOutput(outputId = "genePlot", width = "100%", height = paste0(length(input$genes)*50+450, 'px')),
+               h5('QC plots per cluster'), 
+               p('Click on a cluster in the UMAP to display the respective QC plots and stats'),
+               plotOutput(outputId = "clst_vln", width='100%', height='600px'),
+               plotOutput(outputId = "clst_expr", width='100%', height='600px'),
+               fluidRow(
+                 column(6, DT::dataTableOutput(outputId = 'cdtn1')),
+                 column(6, DT::dataTableOutput(outputId = 'cdtn2'))
+               ),
+               p()
       ),
       tabPanel('Expression Plots',
                h4('Feature/Expression Plots'),
@@ -234,6 +376,32 @@ server <- function(input, output) {
     }
   })
   
+  output$clst_vln <- renderPlot({
+    req(cluster_plots())
+    cluster_plots()$vln_mt
+  })
+  
+  output$clst_expr <- renderPlot({
+    req(cluster_plots())
+    cluster_plots()$feature_s
+  })
+  
+  output$cdtn1 <- DT::renderDataTable({
+    req(cluster_plots())
+    DT::datatable(cluster_plots()$df1, options = list(pageLength = 3, searching = FALSE, 
+                                                      lengthChange = FALSE, 
+                                                      info = FALSE, 
+                                                      paging = FALSE))
+  })
+  
+  output$cdtn2 <- DT::renderDataTable({
+    req(cluster_plots())
+    DT::datatable(cluster_plots()$df2, options = list(pageLength = 3, searching = FALSE, 
+                                                      lengthChange = FALSE, 
+                                                      info = FALSE, 
+                                                      paging = FALSE))
+  })
+  
   # Render the plot for the selected gene expression
   output$genePlot <- renderPlot({
     # Ensure that the gene data is available
@@ -288,11 +456,39 @@ server <- function(input, output) {
     }
     
     if (input$clust_annot=='cell_type' & 'cell_type' %in% colnames(seurat_obj@meta.data)){
-      grouping='cell_type'
-      label_size=10
-      legend_size=10
+      #Set identities and grouping for the UMAP
+      if (input$seurat_obj %in% c('complete_2024')){
+        Idents(seurat_obj) <- 'leiden_cluster.06'
+        
+        # Order cell types based on the numeric cluster ID
+        ordered_cell_types <- seurat_obj@meta.data$cell_type[order(as.numeric(seurat_obj$leiden_cluster.06))]
+        # Remove duplicates while preserving order
+        ordered_cell_types <- unique(ordered_cell_types)
+        # Update the factor levels
+        seurat_obj$cell_type <- factor(seurat_obj$cell_type, levels = ordered_cell_types)
+        
+        grouping='cell_type'
+        label_size=10
+        legend_size=10
+      }
+      else if (input$seurat_obj %in% c('complete_progenitors')){
+        Idents(seurat_obj) <- 'leiden_cluster.09'
+        
+        # Order cell types based on the numeric cluster ID
+        ordered_cell_types <- seurat_obj@meta.data$cell_type[order(as.numeric(seurat_obj$leiden_cluster.09))]
+        # Remove duplicates while preserving order
+        ordered_cell_types <- unique(ordered_cell_types)
+        # Update the factor levels
+        seurat_obj$cell_type <- factor(seurat_obj$cell_type, levels = ordered_cell_types)
+        
+        grouping='cell_type'
+        label_size=10
+        legend_size=10
+      }
     }
     else {
+      
+      Idents(seurat_obj) <- seurat_obj@meta.data[,colnames(seurat_obj[[resolution]])[1]]
       grouping=resolution
       label_size=14
       legend_size=14
@@ -308,7 +504,7 @@ server <- function(input, output) {
     
     #Modify plotly object to make the plot interactive
     if (!is.null(clusterplot)){
-      plotly_obj <- ggplotly(clusterplot)
+      plotly_obj <- ggplotly(source='cluster_umap') %>% event_register('plotly_click')
       plotly_obj <- config(plotly_obj, displaylogo = FALSE, modeBarButtonsToRemove=c('pan2d', 'hoverCompareCartesian', 'drawrect', 'select2d')) %>%
         layout(dragmode = 'select', legend=list(font=list(size=legend_size)), title=list(text='Louvain clusters', size=7))
       
@@ -329,6 +525,7 @@ server <- function(input, output) {
       
       plotly_obj
     }
+    
   })
   
   #Conditional umap plots colored by conditions
