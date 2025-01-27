@@ -215,7 +215,7 @@ server <- function(input, output, session) {
     }
     
     # Violin plot for mitochondrial genes
-    vln_mt <- VlnPlot(seurat_obj, features = c("percent_mt", "percent_ribo", "nFeature_RNA", "nCount_RNA"), ncol = 2, log = TRUE)
+    vln_mt <- VlnPlot(seurat_obj, features = c("percent_mt", "percent_ribo", "nFeature_RNA", "nCount_RNA"), ncol = 4, log = TRUE)
     # Feature plot for S phase
     feature_s <- FeaturePlot(seurat_obj, features = c("nFeature_RNA", "percent_mt"), ncol=2, cols=c('blue', 'red'))
     
@@ -304,7 +304,7 @@ server <- function(input, output, session) {
                plotOutput(outputId = "genePlot", width = "100%", height = paste0(length(input$genes)*50+450, 'px')),
                h5('QC plots per cluster'), 
                p('Click on a cluster in the UMAP to display the respective QC plots and stats'),
-               plotOutput(outputId = "clst_vln", width='100%', height='600px'),
+               plotOutput(outputId = "clst_vln", width='100%', height='400px'),
                plotOutput(outputId = "clst_expr", width='100%', height='600px'),
                fluidRow(
                  column(6, DT::dataTableOutput(outputId = 'cdtn1')),
