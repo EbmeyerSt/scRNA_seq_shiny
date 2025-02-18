@@ -50,7 +50,8 @@ ui <- fluidPage(
                     "0.3" = 'leiden_cluster.03',
                     "0.6" = 'leiden_cluster.06',
                     "0.9" = 'leiden_cluster.09',
-                    "1.2" = 'leiden_cluster.12')
+                    "1.2" = 'leiden_cluster.12',
+                    "custom" = 'custom_resolution')
       ),
       radioButtons(
         inputId = 'clust_annot',
@@ -123,7 +124,7 @@ server <- function(input, output, session) {
         updateRadioButtons(session, "resolution", selected = 'leiden_cluster.09')
       }
       else {
-        updateRadioButtons(session, "resolution", selected = 'leiden_cluster.06')
+        updateRadioButtons(session, "resolution", selected = 'custom_resolution')
       }
       shinyjs::disable("resolution")
     } else {
@@ -158,6 +159,8 @@ server <- function(input, output, session) {
   observeEvent(event_data('plotly_click', source = 'cluster_umap'), {
     click_data <- event_data('plotly_click', source = 'cluster_umap')
     print(paste0('Click_data: ', click_data))
+    print(paste0('Click_data curve: ', click_data$curve))
+    print(paste0('Click_data curve number: ', click_data$curveNumber))
     if (!is.null(click_data) && !is.na(click_data$curve)) {
       seurat_objects$selected_cluster(click_data$curve)
     } else {
@@ -251,7 +254,7 @@ server <- function(input, output, session) {
     #Set resolution manually in case clust_annot == 'cell_type'
     if (input$clust_annot == 'cell_type'){
       if (input$seurat_obj %in% c('complete_2024')){
-        resolution = 'leiden_cluster.06'
+        resolution = 'custom_resolution'
       }
       else if (input$seurat_obj %in% c('complete_progenitors')){
         resolution = 'leiden_cluster.09'
@@ -458,10 +461,10 @@ server <- function(input, output, session) {
     if (input$clust_annot=='cell_type' & 'cell_type' %in% colnames(seurat_obj@meta.data)){
       #Set identities and grouping for the UMAP
       if (input$seurat_obj %in% c('complete_2024')){
-        Idents(seurat_obj) <- 'leiden_cluster.06'
+        Idents(seurat_obj) <- 'custom_resolution'
         
         # Order cell types based on the numeric cluster ID
-        ordered_cell_types <- seurat_obj@meta.data$cell_type[order(as.numeric(seurat_obj$leiden_cluster.06))]
+        ordered_cell_types <- seurat_obj@meta.data$cell_type[order(as.numeric(seurat_obj$custom_resolution))]
         # Remove duplicates while preserving order
         ordered_cell_types <- unique(ordered_cell_types)
         # Update the factor levels
@@ -489,6 +492,7 @@ server <- function(input, output, session) {
     else {
       
       Idents(seurat_obj) <- seurat_obj@meta.data[,colnames(seurat_obj[[resolution]])[1]]
+      print(paste0('umap clust resolution: ', resolution))
       grouping=resolution
       label_size=14
       legend_size=14
@@ -517,8 +521,14 @@ server <- function(input, output, session) {
           new_info <- gsub('cell_type: ', '', cluster_info) 
         }
         else {
-          cluster_info <- grep('^leiden', elements, value = TRUE)
-          new_info <- gsub('leiden_cluster\\.([0-9]+): ', 'Cluster: ', cluster_info)
+          if(! input$resolution == 'custom_resolution'){
+            cluster_info <- grep('^leiden', elements, value = TRUE)
+            new_info <- gsub('leiden_cluster\\.([0-9]+): ', 'Cluster: ', cluster_info)
+          }
+          else {
+            cluster_info <- grep('^custom', elements, value = TRUE)
+            new_info <- gsub('custom_resolution: ', 'Cluster: ', cluster_info)
+          }
         }
         plotly_obj$x$data[[i]]$text <- new_info
       } 
