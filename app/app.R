@@ -9,7 +9,7 @@ library(shinyjs)
 
 #Set working directories for local and for deployment on scilifelab serve
 #setwd('/srv/shiny-server')
-#setwd('/Users/stefanebmeyer/nbis/support_projects/O_Andersson_2024/scripts/scilifelab_serve_shiny2/shiny_december24/')
+setwd('/Users/stefanebmeyer/nbis/support_projects/O_Andersson_2024/scripts/scilifelab_serve_shiny2/shiny_december24/')
 
 
 ui <- fluidPage(
@@ -80,9 +80,9 @@ server <- function(input, output, session) {
   
   observe({
     
-    #all_objs <- readRDS('/Users/stefanebmeyer/nbis/support_projects/O_Andersson_2024/objects_november24/all_objects_int.rds')
+    all_objs <- readRDS('/Users/stefanebmeyer/nbis/support_projects/O_Andersson_2024/objects_november24/all_objects_int.rds')
     #Below path is for scilifelab serve
-    all_objs <- readRDS('/home/data/all_objects_int.rds')
+    #all_objs <- readRDS('/home/data/all_objects_int.rds')
     
     #Read in distinct seurat objects
     seurat_objects$complete_2023 <- all_objs$enteroendocrine_2023$seurat_objects$complete_2023
@@ -103,8 +103,16 @@ server <- function(input, output, session) {
     seurat_objects$DEGs_2023 <- all_objs$enteroendocrine_2023$DEGs
     seurat_objects$DEGs_2024 <- all_objs$enteroendocrine_2024$DEGs
     seurat_objects$DEGs_progenitors <- all_objs$progenitors_2024$DEGs
+    
+    #DEGs between conditions for MEECs 2024
     seurat_objects$DEGs_2024_beta_cells <- all_objs$enteroendocrine_2024$DEGs$complete_2024$DEGs_beta_06
     seurat_objects$DEGs_2024_feeding <- all_objs$enteroendocrine_2024$DEGs$complete_2024$DEGs_feed_06
+    
+    #DEGs between conditions for progenitors 2024
+    seurat_objects$DEGs_treat <- all_objs$progenitors_2024$DEGs$progenitors_complete_2024$DEGs_treat_09$all
+    seurat_objects$DEGs_treat_day1 <- all_objs$progenitors_2024$DEGs$progenitors_complete_2024$DEGs_treat_09$day1
+    seurat_objects$DEGs_treat_day3 <- all_objs$progenitors_2024$DEGs$progenitors_complete_2024$DEGs_treat_09$day3
+    seurat_objects$DEGs_treat_day5 <- all_objs$progenitors_2024$DEGs$progenitors_complete_2024$DEGs_treat_09$day5
     
     #Add value to observe when a cluster is clicked in clusterplot
     seurat_objects$selected_cluster <- reactiveVal(0)
@@ -159,8 +167,6 @@ server <- function(input, output, session) {
   observeEvent(event_data('plotly_click', source = 'cluster_umap'), {
     click_data <- event_data('plotly_click', source = 'cluster_umap')
     print(paste0('Click_data: ', click_data))
-    print(paste0('Click_data curve: ', click_data$curve))
-    print(paste0('Click_data curve number: ', click_data$curveNumber))
     if (!is.null(click_data) && !is.na(click_data$curve)) {
       seurat_objects$selected_cluster(click_data$curve)
     } else {
@@ -189,6 +195,21 @@ server <- function(input, output, session) {
     else if (input$seurat_obj == "progenitors_SMER28") seurat_objects$progenitors_SMER28
     
     resolution <- input$resolution
+    #print warning if the selected resolution does not exist in the respective object
+    print(resolution)
+    if (! resolution %in% colnames(seurat_objects[[input$seurat_obj]]@meta.data)){
+      print('Checking resolution')
+      showNotification(
+        paste0('Resolution ', input$resolution, ' not found in ', input$seurat_obj, '!'),
+        type='error',
+        duration=10)
+      
+      #Set resolution to 01
+      #Reset resolution and cluster annotation upon changing the dataset
+      observeEvent(input$seurat_obj, {
+        updateRadioButtons(session, "resolution", selected = 'leiden_cluster.01')
+      })
+    }
     
     #Set object identities to resolution
     Idents(seurat_obj) <- seurat_obj@meta.data[,colnames(seurat_obj[[resolution]])[1]]
@@ -200,9 +221,14 @@ server <- function(input, output, session) {
     
     degs_beta <- seurat_objects$DEGs_2024_beta_cells
     degs_feeding <- seurat_objects$DEGs_2024_feeding
+    degs_treat <- seurat_objects$DEGs_treat
+    degs_treat_day1 <- seurat_objects$DEGs_treat_day1
+    degs_treat_day3 <- seurat_objects$DEGs_treat_day3
+    degs_treat_day5 <- seurat_objects$DEGs_treat_day5
     
     return(list(genes = genes, seurat_obj = seurat_obj, resolution = resolution, degs=degs,
-                degs_beta = degs_beta, degs_feeding = degs_feeding))
+                degs_beta = degs_beta, degs_feeding = degs_feeding, degs_treat = degs_treat, degs_treat_day1 = degs_treat_day1,
+                degs_treat_day3 = degs_treat_day3, degs_treat_day5 = degs_treat_day5))
   }, ignoreNULL = FALSE)
   
   #Function to be called reactively to generate QC plots per cluster
@@ -332,7 +358,7 @@ server <- function(input, output, session) {
                DT::dataTableOutput(outputId = 'deg_table'))
     )
     
-    if (grepl('ete_2024', input$seurat_obj)) {
+    if (grepl('ete_2024', input$seurat_obj) & input$resolution=='custom_resolution') {
       tabs <- append(tabs, list(
         tabPanel('DEGs 2024 feeding',
                  h4('Differentially Expressed Genes for selected clusters (leiden clustering resolution 0.6) between conditions "fed" and "starved" for variable "feeding"'),
@@ -353,6 +379,51 @@ server <- function(input, output, session) {
                       <b>p_val_adjust</b>: Adjusted p-value after correction for multiple testing<br>
                       <b>cluster</b>: cluster number')),
                  DT::dataTableOutput(outputId = 'deg_table_2024_beta')
+        )
+      ))
+    }
+    
+    else if (grepl('ete_progenitors', input$seurat_obj) & input$resolution=='leiden_cluster.09') {
+      tabs <- append(tabs, list(
+        tabPanel('DEGs progenitors treatment all timepoints',
+                 h4('Differentially Expressed Genes for selected clusters (leiden clustering resolution 0.9) between conditions "DMSO" and "SMER28" for variable "treatment"'),
+                 p(HTML('Differentially expressed genes between "DMSO" and "SMER28" for respective cluster. Columns:<br>
+                      <b>avg_log2FC</b>: Average log2 fold Change in expression, positive values indicate higher expression in "SMER28"<br>
+                      <b>pct.1</b>: Percentage of cells in "SMER28" group expressing the gene<br>
+                      <b>pct.2</b>: percentage of cells in "DMSO" group expressing the gene<br>
+                      <b>p_val_adjust</b>: Adjusted p-value after correction for multiple testing<br>
+                      <b>cluster</b>: cluster number')),
+                 DT::dataTableOutput(outputId = 'deg_table_2024_treat')
+        ),
+        tabPanel('DEGs progenitors treatment day1',
+                 h4('Differentially Expressed Genes for selected clusters (leiden clustering resolution 0.9) between conditions "DMSO" and "SMER28" for variable "treatment"'),
+                 p(HTML('Differentially expressed genes between "SMER28" and "DMSO" for respective cluster. Columns:<br>
+                      <b>avg_log2FC</b>: Average log2 fold Change in expression, positive values indicate higher expression in "SMER28"<br>
+                      <b>pct.1</b>: Percentage of cells in "SMER28" group expressing the gene<br>
+                      <b>pct.2</b>: percentage of cells in "DMSO" group expressing the gene<br>
+                      <b>p_val_adjust</b>: Adjusted p-value after correction for multiple testing<br>
+                      <b>cluster</b>: cluster number')),
+                 DT::dataTableOutput(outputId = 'deg_table_2024_treat1')
+        ),
+        tabPanel('DEGs progenitors treatment day3',
+                 h4('Differentially Expressed Genes for selected clusters (leiden clustering resolution 0.9) between conditions "DMSO" and "SMER28" for variable "treatment"'),
+                 p(HTML('Differentially expressed genes between "SMER28" and "DMSO" for respective cluster. Columns:<br>
+                      <b>avg_log2FC</b>: Average log2 fold Change in expression, positive values indicate higher expression in "SMER28"<br>
+                      <b>pct.1</b>: Percentage of cells in "SMER28" group expressing the gene<br>
+                      <b>pct.2</b>: percentage of cells in "DMSO" group expressing the gene<br>
+                      <b>p_val_adjust</b>: Adjusted p-value after correction for multiple testing<br>
+                      <b>cluster</b>: cluster number')),
+                 DT::dataTableOutput(outputId = 'deg_table_2024_treat3')
+        ),
+        tabPanel('DEGs progenitors treatment day5',
+                 h4('Differentially Expressed Genes for selected clusters (leiden clustering resolution 0.9) between conditions "DMSO" and "SMER28" for variable "treatment"'),
+                 p(HTML('Differentially expressed genes between "SMER28" and "DMSO" for respective cluster. Columns:<br>
+                      <b>avg_log2FC</b>: Average log2 fold Change in expression, positive values indicate higher expression in "SMER28"<br>
+                      <b>pct.1</b>: Percentage of cells in "SMER28" group expressing the gene<br>
+                      <b>pct.2</b>: percentage of cells in "DMSO" group expressing the gene<br>
+                      <b>p_val_adjust</b>: Adjusted p-value after correction for multiple testing<br>
+                      <b>cluster</b>: cluster number')),
+                 DT::dataTableOutput(outputId = 'deg_table_2024_treat5')
         )
       ))
     }
@@ -492,7 +563,6 @@ server <- function(input, output, session) {
     else {
       
       Idents(seurat_obj) <- seurat_obj@meta.data[,colnames(seurat_obj[[resolution]])[1]]
-      print(paste0('umap clust resolution: ', resolution))
       grouping=resolution
       label_size=14
       legend_size=14
@@ -713,6 +783,57 @@ server <- function(input, output, session) {
     resolution <- genes_data$resolution
     dataset <- input$seurat_obj
     deg_list <- genes_data$degs_beta
+    
+    #Render dataframe with DT
+    DT::datatable(deg_list, options = list(pageLength = 60))
+  })
+  
+  output$deg_table_2024_treat <- renderDataTable({
+    # Ensuring gene_data is available
+    genes_data <- gene_data()
+    req(genes_data)
+    resolution <- genes_data$resolution
+    dataset <- input$seurat_obj
+    deg_list <- genes_data$degs_treat
+    
+    #Render dataframe with DT
+    DT::datatable(deg_list, options = list(pageLength = 60))
+  })
+  
+  #Create a table output for displaying the DEGs from 2024 data for cluster resolution 0.6, based on feeding
+  output$deg_table_2024_treat1 <- renderDataTable({
+    # Ensuring gene_data is available
+    genes_data <- gene_data()
+    req(genes_data)
+    resolution <- genes_data$resolution
+    dataset <- input$seurat_obj
+    deg_list <- genes_data$degs_treat_day1
+    
+    #Render dataframe with DT
+    DT::datatable(deg_list, options = list(pageLength = 60))
+  })
+  
+  #Create a table output for displaying the DEGs from 2024 data for cluster resolution 0.6, based on feeding
+  output$deg_table_2024_treat3 <- renderDataTable({
+    # Ensuring gene_data is available
+    genes_data <- gene_data()
+    req(genes_data)
+    resolution <- genes_data$resolution
+    dataset <- input$seurat_obj
+    deg_list <- genes_data$degs_treat_day3
+    
+    #Render dataframe with DT
+    DT::datatable(deg_list, options = list(pageLength = 60))
+  })
+  
+  #Create a table output for displaying the DEGs from 2024 data for cluster resolution 0.6, based on feeding
+  output$deg_table_2024_treat5 <- renderDataTable({
+    # Ensuring gene_data is available
+    genes_data <- gene_data()
+    req(genes_data)
+    resolution <- genes_data$resolution
+    dataset <- input$seurat_obj
+    deg_list <- genes_data$degs_treat_day5
     
     #Render dataframe with DT
     DT::datatable(deg_list, options = list(pageLength = 60))
